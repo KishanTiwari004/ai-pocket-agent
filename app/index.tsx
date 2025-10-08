@@ -1,8 +1,10 @@
+import { firestoreDb } from "@/config/FirebaseConfig";
 import colors from "@/shared/colors";
 import { useAuth, useSSO, useUser } from "@clerk/clerk-expo";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import { doc, setDoc } from "firebase/firestore";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -36,6 +38,7 @@ export default function Index() {
   useEffect(() => {
     if (isSignedIn) {
       //redirect to home screen
+      router.replace("../(tabs)/Home");
     }
     if (isSignedIn != undefined) {
       setLoading(false);
@@ -56,26 +59,41 @@ export default function Index() {
           // For web, defaults to current path
           // For native, you must pass a scheme, like AuthSession.makeRedirectUri({ scheme, path })
           // For more info, see https://docs.expo.dev/versions/latest/sdk/auth-session/#authsessionmakeredirecturioptions
-          redirectUrl: AuthSession.makeRedirectUri(),
+          redirectUrl: AuthSession.makeRedirectUri({
+            scheme: "aipocketagent", // ye app.json me set hai
+          }),
         });
+
+      if (signUp) {
+        await setDoc(doc(firestoreDb, "users", signUp?.emailAddress ?? ""), {
+          email: signUp.emailAddress,
+          name: signUp.firstName + " " + signUp.lastName,
+          joinDate: Date.now(),
+          credits: 20,
+        });
+      }
 
       // If sign in was successful, set the active session
-      if (createdSessionId) {
-        setActive!({
-          session: createdSessionId,
-          navigate: async ({ session }) => {
-            if (session?.currentTask) {
-              // Check for tasks and navigate to custom UI to help users resolve them
-              // See https://clerk.com/docs/custom-flows/overview#session-tasks
-              console.log(session?.currentTask);
-              return;
-            }
+      // if (createdSessionId) {
+      //   setActive!({
+      //     session: createdSessionId,
+      //     navigate: async ({ session }) => {
+      //       if (session?.currentTask) {
+      //         // Check for tasks and navigate to custom UI to help users resolve them
+      //         // See https://clerk.com/docs/custom-flows/overview#session-tasks
+      //         console.log(session?.currentTask);
+      //         return;
+      //       }
 
-            router.push("/");
-          },
-        });
+      //       router.push("/");
+      //     },
+      //   });
+
+      if (createdSessionId) {
+        await setActive!({ session: createdSessionId });
+        router.replace("/(tabs)/Home"); // ya jo bhi tera correct Home ka path hai
       } else {
-        console.log("-", signIn);
+        // console.log("-", signIn);
         // If there is no `createdSessionId`,
         // there are missing requirements, such as MFA
         // Use the `signIn` or `signUp` returned from `startSSOFlow`
